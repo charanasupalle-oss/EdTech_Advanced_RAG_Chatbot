@@ -8,17 +8,13 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 
 from src.config import GROQ_API_KEY, LLM_MODEL, EMBEDDING_MODEL
-from src.chains import (
-    get_document_response,
-    get_history_response,
-    get_general_response,
-)
+from src.chains import get_document_response
 
 
 load_dotenv()
 
 
-# Initialize LLM for question routing
+# Initialize LLM
 router_llm = ChatGroq(
     model=LLM_MODEL,
     api_key=GROQ_API_KEY,
@@ -32,14 +28,40 @@ embeddings = HuggingFaceEmbeddings(
 )
 
 
-# Initialize Supabase client
+# Initialize Supabase
 supabase = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_KEY")
 )
 
 
-# Retrieve documents from Supabase
+# Fixed refusal response
+REFUSAL = (
+    "I couldn't find this information in my uploaded "
+    "learning documents."
+)
+
+
+# Handle greetings only
+def is_greeting(question: str):
+
+    greetings = [
+        "hi",
+        "hello",
+        "hey",
+        "hii",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "thanks",
+        "thank you",
+        "bye"
+    ]
+
+    return question.lower().strip() in greetings
+
+
+# Retrieve ONLY Python_Basics.pdf documents
 def retrieve_documents(question: str, k: int = 3):
 
     query_embedding = embeddings.embed_query(question)
@@ -58,11 +80,20 @@ def retrieve_documents(question: str, k: int = 3):
 
         metadata = row.get("metadata") or {}
 
-        metadata["similarity"] = row.get("similarity")
+        # Restrict source to Python_Basics.pdf
+        source = str(metadata.get("source", ""))
+
+        if "Python_Basics.pdf" not in source:
+            continue
+
+        similarity = row.get("similarity")
 
         doc = Document(
             page_content=row["content"],
-            metadata=metadata
+            metadata={
+                **metadata,
+                "similarity": similarity
+            }
         )
 
         retrieved_docs.append(doc)
@@ -70,92 +101,60 @@ def retrieve_documents(question: str, k: int = 3):
     return retrieved_docs
 
 
-# Classify user question
-def route_question(question: str, history: str = ""):
-
-    routing_prompt = f"""
-    Classify the user's question into exactly one category:
-
-    DOCUMENT: Questions about educational documents, learning,
-    technical concepts, study material, skills or career topics
-    that may require knowledge retrieval.
-
-    HISTORY: Follow-up questions that depend on previous conversation.
-
-    GENERAL: Greetings, casual conversation or questions
-    that do not require document retrieval.
-
-    Conversation History:
-    {history}
-
-    User Question:
-    {question}
-
-    Return only one category:
-    DOCUMENT, HISTORY or GENERAL.
-    """
-
-    response = router_llm.invoke(routing_prompt)
-    category = response.content.strip().upper()
-
-    if "HISTORY" in category and history.strip():
-        return "HISTORY"
-
-    if "DOCUMENT" in category:
-        return "DOCUMENT"
-
-    return "GENERAL"
-
-
-# Main RAG pipeline
+# Main pipeline
 def process_question(question: str, history: str = ""):
 
-    category = route_question(question, history)
-
-    # DOCUMENT route
-    if category == "DOCUMENT":
-
-        retrieved_docs = retrieve_documents(
-            question,
-            k=3
-        )
-
-        context = "\n\n".join(
-            doc.page_content for doc in retrieved_docs
-        )
-
-        answer = get_document_response(
-            context=context,
-            question=question
-        )
-
-        return {
-            "category": "DOCUMENT",
-            "answer": answer,
-            "sources": retrieved_docs
-        }
-
-    # HISTORY route
-    elif category == "HISTORY":
-
-        answer = get_history_response(
-            history=history,
-            question=question
-        )
-
-        return {
-            "category": "HISTORY",
-            "answer": answer,
-            "sources": []
-        }
-
-    # GENERAL route
-    else:
-
-        answer = get_general_response(question)
+    # Allow simple greetings without document retrieval
+    if is_greeting(question):
 
         return {
             "category": "GENERAL",
-            "answer": answer,
+            "answer": "Hello! 👋 Ask me questions about your Python learning document.",
             "sources": []
         }
+
+    # All other questions MUST use the PDF
+    retrieved_docs = retrieve_documents(
+        question,
+        k=3
+    )
+
+    # Reject when no PDF chunks were retrieved
+    if not retrieved_docs:
+
+        return {
+            "category": "DOCUMENT",
+            "answer": REFUSAL,
+            "sources": []
+        }
+
+    # Reject weak retrieval results
+    scores = [
+        doc.metadata.get("similarity")
+        for doc in retrieved_docs
+        if doc.metadata.get("similarity") is not None
+    ]
+
+    if scores and max(scores) < 0.40:
+
+        return {
+            "category": "DOCUMENT",
+            "answer": REFUSAL,
+            "sources": []
+        }
+
+    context = "\n\n".join(
+        doc.page_content for doc in retrieved_docs
+    )
+
+    # Generate answer using PDF context only
+    answer = get_document_response(
+        context=context,
+        question=question
+    )
+
+    return {
+        "category": "DOCUMENT",
+        "answer": answer,
+        "sources": retrieved_docs
+    }
