@@ -1,0 +1,15 @@
+EDTECH LEARNING AND CAREER SUCCESS GUIDE
+
+Learning effectively: Break a learning goal into small weekly objectives. Review concepts regularly, practice actively, and seek feedback when stuck.
+
+Study planning: A useful study plan includes a clear goal, planned practice sessions, short revision periods, and progress review. Adapt the schedule when needed.
+
+Programming skills: Build foundations through hands-on exercises. Practice reading code, debugging, explaining your approach, and completing small projects.
+
+Data skills: Students learning data analytics should practice data cleaning, SQL queries, spreadsheet analysis, visualization, and communicating insights.
+
+Career preparation: Create a portfolio with project descriptions, the problem solved, tools used, your contribution, and results. Prepare to explain your decisions and lessons learned.
+
+Interview preparation: Practice concise introductions, project explanations, technical fundamentals, and behavioral examples. Use specific examples and explain your role clearly.
+
+Academic support: If a concept is difficult, revisit the learning material, attempt a simpler example, practice, and ask a focused question. This guide does not contain individual student records or institutional policies.
