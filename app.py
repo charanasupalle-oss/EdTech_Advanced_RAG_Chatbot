@@ -1,5 +1,6 @@
 
 
+
 import streamlit as st
 from src.rag_pipeline import process_question
 
@@ -100,6 +101,7 @@ div[data-testid="stChatMessage"] code {
 </style>
 """, unsafe_allow_html=True)
 
+
 # Sidebar
 with st.sidebar:
     st.title("🎓 EdTech AI")
@@ -115,7 +117,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("**Powered by**")
-    st.markdown("LangChain · Groq · FAISS")
+    st.markdown("LangChain · Groq · Supabase")
+
 
 # Top Black Header
 st.markdown("""
@@ -124,6 +127,7 @@ st.markdown("""
     <div class="brand-name">EDUTECH</div>
 </div>
 """, unsafe_allow_html=True)
+
 
 # Main heading
 st.markdown(
@@ -138,6 +142,7 @@ st.markdown(
 
 st.markdown("---")
 
+
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -145,31 +150,40 @@ if "messages" not in st.session_state:
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
+
 # Welcome message
 if not st.session_state.messages:
     with st.chat_message("assistant"):
         st.markdown(
             "👋 **Welcome!** I'm your EdTech Learning Assistant.\n\n"
-            "Ask me a question about your learning documents, "
-            "or start a conversation."
+            "Ask questions about Python using your uploaded "
+            "learning document, or ask about our conversation."
         )
+
 
 # Display chat messages
 for message in st.session_state.messages:
+
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
         if message.get("sources"):
+
             with st.expander("📚 View sources"):
+
                 for source in message["sources"]:
+
                     st.markdown(
                         f"- **{source['file']}** | Page: {source['page']}"
                     )
 
+
 # Chat input
 question = st.chat_input("Ask your learning question...")
 
+
 if question:
+
     # Display user message
     st.session_state.messages.append({
         "role": "user",
@@ -179,13 +193,20 @@ if question:
     with st.chat_message("user"):
         st.markdown(question)
 
-    # Build conversation history
-    history = "\n".join(st.session_state.conversation_history)
+
+    # Build conversation history BEFORE adding current question
+    history = "\n".join(
+        st.session_state.conversation_history
+    )
+
 
     # Generate response
     with st.chat_message("assistant"):
+
         with st.spinner("Thinking..."):
+
             try:
+
                 result = process_question(
                     question=question,
                     history=history
@@ -201,8 +222,14 @@ if question:
                 readable_sources = []
 
                 for doc in result.get("sources", []):
-                    source = doc.metadata.get("source", "Unknown")
-                    source_name = source.replace("\\", "/").split("/")[-1]
+
+                    source = doc.metadata.get(
+                        "source", "Unknown"
+                    )
+
+                    source_name = source.replace(
+                        "\\", "/"
+                    ).split("/")[-1]
 
                     page = doc.metadata.get("page")
 
@@ -214,16 +241,22 @@ if question:
                         "page": page
                     })
 
+
                 # Display route
                 st.caption(f"Route: {category}")
 
+
                 # Display sources
                 if readable_sources:
+
                     with st.expander("📚 View sources"):
+
                         for source in readable_sources:
+
                             st.markdown(
                                 f"- **{source['file']}** | Page: {source['page']}"
                             )
+
 
                 # Save assistant message
                 st.session_state.messages.append({
@@ -232,6 +265,7 @@ if question:
                     "sources": readable_sources,
                     "category": category
                 })
+
 
                 # Save conversation history
                 st.session_state.conversation_history.append(
@@ -242,5 +276,7 @@ if question:
                     f"Assistant: {answer}"
                 )
 
+
             except Exception as e:
+
                 st.error(f"Error: {e}")
